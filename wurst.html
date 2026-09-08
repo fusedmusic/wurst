@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wurst — Music visualizer for Mac</title>
+<meta name="description" content="Wurst is a macOS music visualizer. It renders whatever your Mac is playing as one responsive sausage, across eight casings, and exports the result as video.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Archivo:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --smoke:#1A1310;
+    --smoke-2:#241A15;
+    --paper:#EBE3D4;
+    --ink:#221913;
+    --fat:#F3E7D3;
+    --mustard:#E5B23A;
+    --char:#5C2D18;
+    --line:rgba(243,231,211,.16);
+    --serif:"Bricolage Grotesque","Trebuchet MS",sans-serif;
+    --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:var(--smoke);
+    color:var(--fat);
+    font-family:var(--sans);
+    font-size:17px;
+    line-height:1.6;
+  }
+  a{color:inherit}
+  :focus-visible{outline:2px solid var(--mustard);outline-offset:3px;border-radius:2px}
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    display:flex;align-items:baseline;justify-content:space-between;gap:24px;
+    padding:22px clamp(18px,5vw,64px);
+    border-bottom:1px solid var(--line);
+  }
+  .masthead-mark{
+    font-family:var(--serif);
+    font-variation-settings:"wght" 800,"wdth" 92,"opsz" 24;
+    font-size:22px;letter-spacing:-.01em;text-decoration:none;
+  }
+  .masthead-nav{display:flex;gap:clamp(14px,3vw,30px);font-size:15px}
+  .masthead-nav a{text-decoration:none;opacity:.72}
+  .masthead-nav a:hover{opacity:1;text-decoration:underline;text-underline-offset:4px}
+
+  /* ---------- stage ---------- */
+  .stage{
+    padding:clamp(34px,7vw,80px) clamp(18px,5vw,64px) clamp(30px,6vw,64px);
+    text-align:center;
+    background:radial-gradient(120% 90% at 50% 78%, var(--smoke-2) 0%, var(--smoke) 62%);
+  }
+  .lockup{
+    margin:0;display:flex;align-items:flex-end;justify-content:center;gap:.01em;
+    font-family:var(--serif);
+    font-variation-settings:"wght" 800,"wdth" 84,"opsz" 96;
+    font-size:clamp(78px,21vw,236px);
+    line-height:.86;letter-spacing:-.03em;
+    user-select:none;
+  }
+  .lockup .glyph{display:block}
+  .slot{
+    display:block;
+    width:.80em;height:1.02em;
+    margin:0 .015em;
+    position:relative;
+  }
+  .slot canvas{display:block;width:100%;height:100%}
+
+  .stage-play{
+    margin-top:clamp(22px,4vw,42px);
+    display:inline-flex;align-items:center;gap:12px;
+    padding:11px 20px 11px 16px;
+    border:1px solid var(--line);border-radius:999px;
+    background:rgba(243,231,211,.04);
+    color:var(--fat);font:inherit;font-size:15px;
+    cursor:pointer;
+  }
+  .stage-play:hover{background:rgba(243,231,211,.09)}
+  .stage-play .icon{font-size:12px;color:var(--mustard)}
+  .stage-play .bars{display:none;align-items:flex-end;gap:2px;height:14px}
+  .stage-play[aria-pressed="true"] .bars{display:flex}
+  .stage-play[aria-pressed="true"] .icon{display:none}
+  .bars i{
+    display:block;width:2px;background:var(--mustard);
+    height:calc(var(--h) * 1px);
+    animation:jig .7s steps(4,end) infinite alternate;
+    animation-delay:calc(var(--h) * -19ms);
+  }
+  @keyframes jig{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
+  .stage-note{
+    margin:14px auto 0;max-width:38ch;
+    font-size:14px;opacity:.5;line-height:1.5;
+  }
+
+  /* ---------- text columns ---------- */
+  .band{padding:clamp(46px,8vw,104px) clamp(18px,5vw,64px)}
+  .band-inner{max-width:660px}
+  .band h1,.band h2{
+    font-family:var(--serif);
+    font-variation-settings:"wght" 700,"wdth" 88,"opsz" 40;
+    letter-spacing:-.025em;line-height:1.02;margin:0 0 18px;
+  }
+  .band h1{font-size:clamp(36px,6.4vw,66px)}
+  .band h2{font-size:clamp(28px,4.6vw,46px)}
+  .band p{margin:0 0 14px;max-width:58ch}
+  .band p:last-of-type{margin-bottom:0}
+  .cta{
+    display:inline-block;margin-top:30px;
+    font-family:var(--serif);
+    font-variation-settings:"wght" 700,"wdth" 88,"opsz" 18;
+    font-size:19px;text-decoration:none;
+    padding-bottom:5px;border-bottom:2px solid var(--mustard);
+  }
+  .cta:hover{color:var(--mustard)}
+  .version{opacity:.55;font-size:15px}
+
+  /* ---------- casings ---------- */
+  .casings{
+    background:var(--paper);color:var(--ink);
+    padding:clamp(46px,8vw,96px) clamp(18px,5vw,64px);
+  }
+  .casings h2{
+    font-family:var(--serif);
+    font-variation-settings:"wght" 700,"wdth" 88,"opsz" 40;
+    font-size:clamp(28px,4.6vw,46px);letter-spacing:-.025em;line-height:1.05;
+    margin:0 0 12px;
+  }
+  .casings-intro{max-width:52ch;margin:0 0 34px;color:rgba(34,25,19,.72)}
+  .casing-grid{
+    display:grid;gap:10px;padding:0;margin:0;list-style:none;
+    grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+    max-width:900px;
+  }
+  .casing{
+    display:flex;align-items:center;gap:11px;width:100%;
+    padding:10px 13px;
+    border:1px solid rgba(34,25,19,.2);border-radius:999px;
+    background:transparent;color:inherit;font:inherit;font-size:15px;
+    cursor:pointer;text-align:left;
+  }
+  .casing:hover{border-color:rgba(34,25,19,.55)}
+  .casing[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .swatch{
+    flex:none;width:34px;height:13px;border-radius:999px;
+    box-shadow:inset 0 -3px 5px rgba(0,0,0,.35), inset 0 2px 3px rgba(255,255,255,.28);
+  }
+
+  /* ---------- film ---------- */
+  .film{
+    display:grid;gap:clamp(20px,4vw,44px);align-items:center;
+    grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+    padding:clamp(46px,8vw,96px) clamp(18px,5vw,64px);
+    border-top:1px solid var(--line);
+  }
+  .film-frame{
+    margin:0;position:relative;border-radius:6px;overflow:hidden;
+    background:linear-gradient(160deg,#3A1D12,#160D09 70%);
+    aspect-ratio:16/9;display:grid;place-items:center;
+  }
+  .film-frame svg{width:62%;height:auto;opacity:.92}
+  .film-play{
+    position:absolute;inset:auto auto 14px 14px;
+    width:38px;height:38px;border-radius:50%;
+    background:rgba(26,19,16,.72);border:1px solid var(--line);
+    display:grid;place-items:center;font-size:12px;color:var(--fat);
+    text-decoration:none;
+  }
+  .film h2{
+    font-family:var(--serif);
+    font-variation-settings:"wght" 700,"wdth" 88,"opsz" 34;
+    font-size:clamp(26px,3.6vw,38px);letter-spacing:-.025em;margin:0 0 10px;line-height:1.05;
+  }
+  .film p{margin:0;opacity:.75;max-width:40ch}
+
+  /* ---------- related + footer ---------- */
+  .related{
+    padding:clamp(34px,6vw,64px) clamp(18px,5vw,64px);
+    border-top:1px solid var(--line);
+  }
+  .related h2{font-size:15px;font-weight:500;opacity:.5;margin:0 0 14px;font-family:var(--sans)}
+  .related ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:10px 26px}
+  .related a{text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:3px}
+  .related a:hover{border-color:var(--mustard)}
+
+  .site-footer{
+    padding:clamp(34px,6vw,64px) clamp(18px,5vw,64px) 48px;
+    border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:flex-end;
+    font-size:14px;
+  }
+  .site-footer p{margin:0 0 4px;opacity:.5}
+  .site-footer a{opacity:.75}
+  .footer-nav{display:flex;gap:18px;flex-wrap:wrap}
+  .footer-nav a{text-decoration:none}
+  .footer-nav a:hover{text-decoration:underline;text-underline-offset:4px}
+
+  @media (max-width:720px){
+    .film{grid-template-columns:1fr}
+    .masthead{flex-direction:column;align-items:flex-start;gap:12px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .bars i{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <a class="masthead-mark" href="#overview">Wurst</a>
+  <nav class="masthead-nav" aria-label="Primary">
+    <a href="#casings">Casings</a>
+    <a href="#download">Download</a>
+    <a href="#film">Made in Wurst</a>
+    <a href="#support">Support</a>
+  </nav>
+</header>
+
+<main>
+  <section class="stage">
+    <p class="lockup" aria-label="Wurst">
+      <span class="glyph" aria-hidden="true">W</span>
+      <span class="slot"><canvas id="link" role="img" aria-label="A sausage bent into the letter U, swelling and browning in time with the sample loop"></canvas></span>
+      <span class="glyph" aria-hidden="true">R</span>
+      <span class="glyph" aria-hidden="true">S</span>
+      <span class="glyph" aria-hidden="true">T</span>
+    </p>
+
+    <button type="button" class="stage-play" id="play" aria-pressed="false">
+      <span class="icon" aria-hidden="true">▶</span>
+      <span class="bars" aria-hidden="true"><i style="--h:4"></i><i style="--h:11"></i><i style="--h:7"></i><i style="--h:14"></i><i style="--h:9"></i><i style="--h:12"></i><i style="--h:6"></i><i style="--h:13"></i></span>
+      <span id="play-label">Play music</span>
+    </button>
+    <p class="stage-note">A sample loop, made in the page. On your Mac it runs on whatever is already playing.</p>
+  </section>
+
+  <section class="band" id="overview">
+    <div class="band-inner">
+      <h1>Your music, made meat.</h1>
+      <p>Wurst is a macOS app that takes the audio coming out of your Mac — an album, a film, a call you probably shouldn't be visualising — and renders it as a single sausage. Bass fills the belly. Treble crisps the ends. The casing browns as the track gets louder and splits when it gets too loud.</p>
+      <p>Leave it up on a second screen for the length of a record, or export the whole thing as video.</p>
+      <a class="cta" href="#casings">See the casings</a>
+    </div>
+  </section>
+
+  <section class="casings" id="casings">
+    <h2>Eight casings.</h2>
+    <p class="casings-intro">Each one changes the colour, the grain of the mince and how hard the thing chars under a heavy low end. Pick one and the sausage above changes.</p>
+    <ul class="casing-grid" id="casing-grid"></ul>
+  </section>
+
+  <section class="band" id="download">
+    <div class="band-inner">
+      <h2>Put a sausage on your screen.</h2>
+      <p class="version">Version 1.9.2. Free range. macOS 13 or later.</p>
+      <a class="cta" href="#download">Download Wurst</a>
+    </div>
+  </section>
+
+  <section class="film" id="film">
+    <figure class="film-frame">
+      <svg viewBox="0 0 300 170" aria-hidden="true">
+        <defs>
+          <linearGradient id="fg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#E0A768"/>
+            <stop offset="1" stop-color="#7C3D1C"/>
+          </linearGradient>
+        </defs>
+        <path d="M52 118 C 30 78, 58 42, 96 52 C 132 62, 150 104, 190 108 C 226 112, 246 84, 240 58"
+              fill="none" stroke="url(#fg)" stroke-width="34" stroke-linecap="round"/>
+        <path d="M52 118 C 30 78, 58 42, 96 52 C 132 62, 150 104, 190 108 C 226 112, 246 84, 240 58"
+              fill="none" stroke="rgba(255,240,220,.22)" stroke-width="6" stroke-linecap="round"
+              transform="translate(-5,-9)"/>
+      </svg>
+      <a class="film-play" href="#film" aria-label="Play the reel">▶</a>
+    </figure>
+    <div>
+      <h2>Made in Wurst.</h2>
+      <p>Full records, rendered one link at a time. No commentary, no cuts, just the meat responding for forty minutes.</p>
+    </div>
+  </section>
+
+  <nav class="related" aria-label="More about Wurst">
+    <h2>More about Wurst</h2>
+    <ul>
+      <li><a href="#overview">Music visualizer for Mac</a></li>
+      <li><a href="#overview">Spotify and Apple Music sausage</a></li>
+      <li><a href="#download">Export a sausage video</a></li>
+      <li><a href="#casings">Casing reference</a></li>
+    </ul>
+  </nav>
+</main>
+
+<footer class="site-footer" id="support">
+  <div>
+    <p>Questions, or a casing request?</p>
+    <a href="mailto:hello@wurst.example">hello@wurst.example</a>
+  </div>
+  <div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="#support">Privacy</a><a href="#support">Terms</a><a href="#support">Refunds</a><a href="#support">Support</a>
+    </nav>
+    <p style="margin-top:12px">© 2026 Wurst. Cased in London.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============ casings ============ */
+  var CASINGS = [
+    {name:"Bratwurst",   base:"#D9A96A", light:"#F2D3A0", dark:"#7A4E22", speck:"#F6E9CF", speckA:.55, glow:"#E0A24E"},
+    {name:"Cumberland",  base:"#C1793B", light:"#E8B478", dark:"#5F3115", speck:"#F0DCB6", speckA:.5,  glow:"#D08A3E"},
+    {name:"Chorizo",     base:"#B03A22", light:"#DD7448", dark:"#4C160B", speck:"#F0A24A", speckA:.6,  glow:"#D64A22"},
+    {name:"Frankfurter", base:"#D08663", light:"#EFB395", dark:"#6E3721", speck:"#EFC7AE", speckA:.18, glow:"#E08A5E"},
+    {name:"Merguez",     base:"#96311F", light:"#C55C3C", dark:"#3D1109", speck:"#E07A3A", speckA:.5,  glow:"#BE3C1E"},
+    {name:"Andouille",   base:"#5A3524", light:"#8D5C3C", dark:"#20100A", speck:"#C89B6A", speckA:.45, glow:"#8A4E2A"},
+    {name:"Black pudding",base:"#33202A", light:"#5E3B45", dark:"#120A0F", speck:"#F3E7D3", speckA:.7, glow:"#6A3446"},
+    {name:"Meat-free",   base:"#C2AE84", light:"#E4D7B2", dark:"#6B5C38", speck:"#7E8F4E", speckA:.6,  glow:"#B9AE6E"}
+  ];
+  var casing = CASINGS[0];
+
+  var grid = document.getElementById("casing-grid");
+  CASINGS.forEach(function(c, i){
+    var li = document.createElement("li");
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "casing";
+    b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    var sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = "linear-gradient(180deg," + c.light + "," + c.base + " 55%," + c.dark + ")";
+    b.appendChild(sw);
+    b.appendChild(document.createTextNode(c.name));
+    b.addEventListener("click", function(){
+      casing = c;
+      Array.prototype.forEach.call(grid.querySelectorAll(".casing"), function(o){
+        o.setAttribute("aria-pressed", o === b ? "true" : "false");
+      });
+      if(!running) draw(performance.now()/1000);
+    });
+    li.appendChild(b);
+    grid.appendChild(li);
+  });
+
+  /* ============ canvas + geometry ============ */
+  var cv = document.getElementById("link");
+  var ctx = cv.getContext("2d");
+  var W = 0, H = 0, dpr = 1;
+  var N = 170;
+  var pts = [];        /* centreline samples */
+  var rBase = 10;
+  var level = new Float32Array(N);
+  var specks = [];
+  var sizzle = [];
+  var pulse = 0;
+
+  for(var s = 0; s < 90; s++){
+    specks.push({t: Math.random(), o: Math.random() * 1.6 - .8, r: .5 + Math.random() * 1.4});
+  }
+
+  function resize(){
+    var r = cv.getBoundingClientRect();
+    if(!r.width) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    build();
+  }
+
+  function build(){
+    pts = [];
+    var pad = W * 0.175;
+    rBase = pad * 0.60;
+    var x1 = pad, x2 = W - pad;
+    var R = (x2 - x1) / 2, cx = (x1 + x2) / 2;
+    var yTop = H * 0.05 + rBase * .2;
+    var cy = H - R - rBase - 2;
+    if(cy < yTop + 4) cy = yTop + 4;
+
+    var legLen = cy - yTop, arcLen = Math.PI * R;
+    var total = legLen * 2 + arcLen;
+    var nLeg = Math.max(2, Math.round(N * legLen / total));
+    var nArc = N - nLeg * 2;
+
+    var i;
+    for(i = 0; i < nLeg; i++){
+      pts.push({x: x1, y: yTop + legLen * (i / nLeg)});
+    }
+    for(i = 0; i <= nArc; i++){
+      var th = Math.PI - Math.PI * (i / nArc);
+      pts.push({x: cx + R * Math.cos(th), y: cy + R * Math.sin(th)});
+    }
+    for(i = 1; i <= nLeg; i++){
+      pts.push({x: x2, y: cy - legLen * (i / nLeg)});
+    }
+
+    /* tangents + normals */
+    for(i = 0; i < pts.length; i++){
+      var a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var m = Math.hypot(dx, dy) || 1;
+      pts[i].nx = -dy / m; pts[i].ny = dx / m;
+      pts[i].t = i / (pts.length - 1);
+    }
+    if(level.length !== pts.length) level = new Float32Array(pts.length);
+  }
+
+  /* ============ audio ============ */
+  var ac = null, master = null, analyser = null, freq = null;
+  var running = false, timer = null, step = 0, nextTime = 0, noiseBuf = null;
+  var kicks = [], sizzleSrc = null, sizzleGain = null;
+  var BPM = 112, STEP = (60 / BPM) / 4;
+  var BASS = [55, 0, 0, 55, 0, 0, 65.41, 0, 73.42, 0, 0, 82.41, 0, 0, 65.41, 0];
+
+  function makeNoise(){
+    var len = Math.floor(ac.sampleRate * 2);
+    var buf = ac.createBuffer(1, len, ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function noiseVoice(time, dur, type, f, q, gain){
+    var src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    var flt = ac.createBiquadFilter(); flt.type = type; flt.frequency.value = f; flt.Q.value = q;
+    var g = ac.createGain();
+    g.gain.setValueAtTime(gain, time);
+    g.gain.exponentialRampToValueAtTime(0.0008, time + dur);
+    src.connect(flt); flt.connect(g); g.connect(master);
+    src.start(time); src.stop(time + dur + .02);
+  }
+
+  function playStep(i, time){
+    if(i === 0 || i === 7 || i === 10){
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(125, time);
+      o.frequency.exponentialRampToValueAtTime(44, time + .11);
+      g.gain.setValueAtTime(.85, time);
+      g.gain.exponentialRampToValueAtTime(.0008, time + .24);
+      o.connect(g); g.connect(master);
+      o.start(time); o.stop(time + .26);
+      kicks.push(time);
+    }
+    if(i === 4 || i === 12) noiseVoice(time, .16, "bandpass", 1850, 1.1, .34);
+    if(i % 2 === 1) noiseVoice(time, .035, "highpass", 7200, .8, .12);
+
+    var hz = BASS[i];
+    if(hz){
+      var b = ac.createOscillator(), bf = ac.createBiquadFilter(), bg = ac.createGain();
+      b.type = "sawtooth"; b.frequency.value = hz;
+      bf.type = "lowpass"; bf.Q.value = 6;
+      bf.frequency.setValueAtTime(620, time);
+      bf.frequency.exponentialRampToValueAtTime(180, time + .2);
+      bg.gain.setValueAtTime(.0008, time);
+      bg.gain.exponentialRampToValueAtTime(.3, time + .012);
+      bg.gain.exponentialRampToValueAtTime(.0008, time + .22);
+      b.connect(bf); bf.connect(bg); bg.connect(master);
+      b.start(time); b.stop(time + .24);
+    }
+  }
+
+  function schedule(){
+    while(nextTime < ac.currentTime + .18){
+      playStep(step, nextTime);
+      nextTime += STEP;
+      step = (step + 1) % 16;
+    }
+  }
+
+  function start(){
+    if(!ac){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      ac = new AC();
+      master = ac.createGain(); master.gain.value = 0;
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = .68;
+      freq = new Uint8Array(analyser.frequencyBinCount);
+      master.connect(analyser); analyser.connect(ac.destination);
+      noiseBuf = makeNoise();
+    }
+    if(ac.state === "suspended") ac.resume();
+
+    sizzleSrc = ac.createBufferSource(); sizzleSrc.buffer = noiseBuf; sizzleSrc.loop = true;
+    var sf = ac.createBiquadFilter(); sf.type = "bandpass"; sf.frequency.value = 4200; sf.Q.value = .6;
+    sizzleGain = ac.createGain(); sizzleGain.gain.value = .045;
+    sizzleSrc.connect(sf); sf.connect(sizzleGain); sizzleGain.connect(master);
+    sizzleSrc.start();
+
+    master.gain.cancelScheduledValues(ac.currentTime);
+    master.gain.setValueAtTime(0.0001, ac.currentTime);
+    master.gain.linearRampToValueAtTime(.85, ac.currentTime + .25);
+
+    step = 0; nextTime = ac.currentTime + .06; kicks = [];
+    timer = setInterval(schedule, 25);
+    running = true;
+  }
+
+  function stop(){
+    if(!ac) return;
+    clearInterval(timer); timer = null;
+    master.gain.cancelScheduledValues(ac.currentTime);
+    master.gain.setValueAtTime(master.gain.value, ac.currentTime);
+    master.gain.linearRampToValueAtTime(0.0001, ac.currentTime + .18);
+    if(sizzleSrc){ try{ sizzleSrc.stop(ac.currentTime + .3); }catch(e){} sizzleSrc = null; }
+    running = false; kicks = [];
+  }
+
+  var playBtn = document.getElementById("play");
+  var playLabel = document.getElementById("play-label");
+  playBtn.addEventListener("click", function(){
+    if(running){
+      stop();
+      playBtn.setAttribute("aria-pressed", "false");
+      playLabel.textContent = "Play music";
+    } else {
+      start();
+      playBtn.setAttribute("aria-pressed", "true");
+      playLabel.textContent = "Stop";
+    }
+  });
+
+  /* ============ render ============ */
+  function bandFor(t){
+    var d = Math.abs(t - .5) * 2;            /* 0 at the bend, 1 at the tips */
+    return Math.min(230, Math.floor(Math.pow(d, 1.55) * 150) + 2);
+  }
+
+  function draw(now){
+    if(!pts.length) return;
+    ctx.clearRect(0, 0, W, H);
+
+    if(running && analyser){
+      analyser.getByteFrequencyData(freq);
+      while(kicks.length && ac.currentTime >= kicks[0]){
+        kicks.shift();
+        pulse = 1;
+        for(var k = 0; k < 5; k++){
+          var t = Math.random();
+          sizzle.push({t: t, side: Math.random() < .5 ? 1 : -1, life: 1, vy: .5 + Math.random() * .9, dx: (Math.random() - .5) * .7});
+        }
+      }
+    }
+    pulse *= .90;
+
+    var i, target;
+    for(i = 0; i < pts.length; i++){
+      if(running && freq){
+        target = freq[bandFor(pts[i].t)] / 255;
+        target = Math.pow(target, 1.15);
+      } else {
+        target = .26 + .1 * Math.sin(now * 1.15 + pts[i].t * 3.4);
+      }
+      level[i] += (target - level[i]) * .3;
+    }
+
+    /* radius per sample, with tapered ends */
+    var rad = new Float32Array(pts.length);
+    for(i = 0; i < pts.length; i++){
+      var e = Math.min(pts[i].t, 1 - pts[i].t) / .07;
+      var taper = e >= 1 ? 1 : (.5 + .5 * Math.sin((e - .5) * Math.PI));
+      rad[i] = rBase * taper * (1 + .30 * level[i] + .16 * pulse);
+    }
+
+    /* outline */
+    function outline(scale){
+      ctx.beginPath();
+      for(i = 0; i < pts.length; i++){
+        var p = pts[i], r = rad[i] * scale;
+        var x = p.x + p.nx * r, y = p.y + p.ny * r;
+        if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      var last = pts[pts.length - 1], rl = rad[pts.length - 1] * scale;
+      for(var a = 0; a <= 10; a++){
+        var an = a / 10 * Math.PI;
+        var nx = last.nx * Math.cos(an) - (-last.ny) * Math.sin(an);
+        var ny = last.ny * Math.cos(an) + (-last.nx) * Math.sin(an);
+        ctx.lineTo(last.x + nx * rl, last.y + ny * rl);
+      }
+      for(i = pts.length - 1; i >= 0; i--){
+        ctx.lineTo(pts[i].x - pts[i].nx * rad[i] * scale, pts[i].y - pts[i].ny * rad[i] * scale);
+      }
+      ctx.closePath();
+    }
+
+    /* body */
+    ctx.save();
+    ctx.shadowColor = casing.glow;
+    ctx.shadowBlur = 12 + 34 * pulse;
+    var g = ctx.createLinearGradient(0, 0, W * .85, H);
+    g.addColorStop(0, casing.light);
+    g.addColorStop(.42, casing.base);
+    g.addColorStop(1, casing.dark);
+    ctx.fillStyle = g;
+    outline(1);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.clip();
+    outline(1);
+    ctx.clip();
+
+    /* char along the underside */
+    ctx.strokeStyle = "rgba(30,12,6,.30)";
+    ctx.lineWidth = rBase * .5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for(i = 0; i < pts.length; i++){
+      var pc = pts[i], rc = rad[i] * .95;
+      var cxp = pc.x - pc.nx * rc, cyp = pc.y - pc.ny * rc;
+      if(i === 0) ctx.moveTo(cxp, cyp); else ctx.lineTo(cxp, cyp);
+    }
+    ctx.stroke();
+
+    /* grain */
+    for(i = 0; i < specks.length; i++){
+      var sp = specks[i];
+      var idx = Math.min(pts.length - 1, Math.floor(sp.t * (pts.length - 1)));
+      var pp = pts[idx], rr = rad[idx];
+      ctx.globalAlpha = casing.speckA * (.5 + .5 * level[idx]);
+      ctx.fillStyle = casing.speck;
+      ctx.beginPath();
+      ctx.arc(pp.x + pp.nx * rr * sp.o, pp.y + pp.ny * rr * sp.o, sp.r * (rBase / 14), 0, 6.283);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    /* grill bars */
+    ctx.strokeStyle = "rgba(46,18,8,.45)";
+    ctx.lineWidth = Math.max(2, rBase * .22);
+    for(i = 8; i < pts.length - 8; i += 13){
+      var pg = pts[i], rg = rad[i] * 1.05;
+      ctx.globalAlpha = .25 + .45 * level[i];
+      ctx.beginPath();
+      ctx.moveTo(pg.x + pg.nx * rg, pg.y + pg.ny * rg);
+      ctx.lineTo(pg.x - pg.nx * rg, pg.y - pg.ny * rg);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    /* sheen */
+    ctx.strokeStyle = "rgba(255,244,226,.30)";
+    ctx.lineWidth = Math.max(1.5, rBase * .2);
+    ctx.beginPath();
+    for(i = 0; i < pts.length; i++){
+      var ps = pts[i], rs = rad[i] * .5;
+      var xs = ps.x + ps.nx * rs, ys = ps.y + ps.ny * rs;
+      if(i === 0) ctx.moveTo(xs, ys); else ctx.lineTo(xs, ys);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    /* ties at both ends */
+    ctx.strokeStyle = "rgba(28,14,8,.55)";
+    ctx.lineWidth = Math.max(2, rBase * .18);
+    [4, pts.length - 5].forEach(function(ix){
+      var p = pts[ix], r = rad[ix] * 1.02;
+      ctx.beginPath();
+      ctx.moveTo(p.x + p.nx * r, p.y + p.ny * r);
+      ctx.lineTo(p.x - p.nx * r, p.y - p.ny * r);
+      ctx.stroke();
+    });
+
+    /* sizzle */
+    for(i = sizzle.length - 1; i >= 0; i--){
+      var z = sizzle[i];
+      z.life -= .035;
+      if(z.life <= 0){ sizzle.splice(i, 1); continue; }
+      var zi = Math.min(pts.length - 1, Math.floor(z.t * (pts.length - 1)));
+      var zp = pts[zi], zr = rad[zi];
+      var zx = zp.x + zp.nx * zr * z.side + z.dx * (1 - z.life) * 26;
+      var zy = zp.y + zp.ny * zr * z.side - (1 - z.life) * z.vy * 30;
+      ctx.globalAlpha = z.life * .8;
+      ctx.fillStyle = casing.speck;
+      ctx.beginPath();
+      ctx.arc(zx, zy, 1.4 * z.life + .5, 0, 6.283);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  function loop(ms){
+    if(!reduce.matches || running) draw(ms / 1000);
+    requestAnimationFrame(loop);
+  }
+
+  if(window.ResizeObserver){
+    new ResizeObserver(function(){ resize(); if(!running) draw(performance.now() / 1000); }).observe(cv);
+  }
+  window.addEventListener("resize", resize);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
+  resize();
+  draw(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
